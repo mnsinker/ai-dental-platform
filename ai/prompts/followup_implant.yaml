@@ -1,0 +1,18 @@
+treatment: implant
+
+day_1:
+  required_questions:
+    - pain_score
+    - bleeding
+    - swelling
+    - fever
+
+  escalation_rules:
+    - if: pain_score >= 7
+      action: escalate_to_doctor
+
+    - if: bleeding == true
+      action: escalate_to_doctor
+
+  missing_info:
+    action: ask_followup
