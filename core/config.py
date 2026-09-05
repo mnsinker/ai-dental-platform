@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     DEEPSEEK_MODEL: str = "deepseek-chat"
     DEEPSEEK_BASE_URL: str = "https://api.deepseek.com"
 
+    WECOM_CORP_ID: str
+    WECOM_AGENT_ID: str
+    WECOM_SECRET: str
+
 
 
 settings = Settings()
