@@ -49,3 +49,6 @@ checkpoints/
 
 # LangGraph / local runtime artifacts if added later
 .langgraph_api/
+
+# front end
+frontend_react/.next/
