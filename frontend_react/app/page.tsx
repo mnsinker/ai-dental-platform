@@ -42,19 +42,20 @@ export default function Home() {
 
     async function loadAssessment() {
       try {
-        const response = await fetch("http://127.0.0.1:8000/followups/reply", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            followup_id: "F001",
-            patient_id: "P001",
-            treatment_id: "T001",
-            patient_name: mockFollowup.patient.name,
-            patient_reply: mockFollowup.latestPatientMessage,
-          }),
-        });
+        const response = await fetch(
+  `${process.env.NEXT_PUBLIC_API_BASE_URL}/followups/reply`,
+  {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({
+      followup_id: "F001",
+      patient_id: "P001",
+      treatment_id: "T001",
+      patient_name: mockFollowup.patient.name,
+      patient_reply: mockFollowup.latestPatientMessage,
+    }),
+  }
+);
 
         if (!response.ok) {
           throw new Error(`API request failed: ${response.status}`);
