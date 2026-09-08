@@ -1,0 +1,611 @@
+===== 1. followup_state.py =====
+import operator
+from enum import StrEnum
+from typing import TypedDict, Optional, Literal, Annotated
+from domains.followup.schemas.patient_context import PatientContext
+
+"""
+=======================  0. BaseState =========================
+"""
+class FollowupBaseState(TypedDict, total=False):
+    followup_id: str
+    patient_id: str
+    patient_context: PatientContext
+    treatment_id: str
+
+
+
+"""
+======================= 1. InitialFollowupState =======================
+"""
+class InitialFollowupState(FollowupBaseState, total=False):
+    initial_msg: str
+
+
+
+"""
+=======================  2. ProcessReplyState ==========================
+"""
+# ---------------------- 2.1 Events -------------------
+class EventType(StrEnum):
+    MESSAGE_GENERATED = "MESSAGE_GENERATED"
+    MESSAGE_DELIVERED = "MESSAGE_DELIVERED"
+    ASSESSMENT_COMPLETED = "ASSESSMENT_COMPLETED"
+    FOLLOWUP_VIEWED = "FOLLOWUP_VIEWED"
+    OWNER_CHANGED = "OWNER_CHANGED"
+
+class ActorRole(StrEnum):
+    PATIENT = "patient"
+    CONSULTANT = "consultant"
+    DOCTOR = "doctor"
+    AI = "ai"
+    SYSTEM = "system"
+
+class Action(StrEnum):
+    NORMAL = "NORMAL"
+    ASK_MORE = "ASK_MORE"
+    ESCALATE = "ESCALATE"
+
+class FollowupStatus(StrEnum):
+    NOT_STARTED = "NOT_STARTED"
+    WAITING_PATIENT = "WAITING_PATIENT"
+    IN_PROGRESS = "IN_PROGRESS"
+    ESCALATED = "ESCALATED"
+    COMPLETED = "COMPLETED"
+
+class MessageEventData(TypedDict, total=False):
+    actor_role: ActorRole
+    actor_id: str       # optional
+    actor_name: str     # optional
+    target_role: ActorRole
+    target_id: str      # optional = external_userid
+    target_name: str    # optional
+    content: str
+
+class AssessmentEventData(TypedDict):
+    actor_role: Literal["ai"]
+    action: Action
+    matched_rules: list[str]
+    missing_fields: list[str]
+
+class ViewedEventData(TypedDict):
+    actor_role: Literal["consultant", "doctor"]
+    actor_name: str
+
+class OwnerChangedEventData(TypedDict):
+    actor_role: Literal["consultant", "doctor", "system"]
+    actor_name: str
+    from_owner_role: Literal["consultant", "doctor"]
+    from_owner_name: str
+    to_owner_role: Literal["consultant", "doctor"]
+    to_owner_name: str
+
+EventData = MessageEventData | AssessmentEventData | ViewedEventData | OwnerChangedEventData
+
+class FollowupEvent(TypedDict):
+    event_type: EventType
+    data: EventData
+    timestamp: str
+
+
+# ---------------------- 2.2 Current Snapshots -------------------
+class FeedbackSnapshot(TypedDict, total=False):
+    pain_score: Optional[int]
+    current_bleeding: Optional[bool]
+    recent_bleeding: Optional[bool]
+    swelling: Optional[bool]
+    fever: Optional[bool]
+
+class AssessmentSnapshot(TypedDict, total=False):
+    action: Action
+    matched_rules: list[str]
+    missing_fields: list[str]
+
+
+# ---------------------- 2.3 ProcessReplyState -------------------
+class ProcessReplyState(FollowupBaseState, total=False):
+    # ============= current working data =================
+    patient_reply: str
+    next_reply: str
+    doctor_notification: str
+
+    # =============== current snapshot ====================
+    followup_status: FollowupStatus
+    current_owner_role: Literal["consultant", "doctor"]
+    current_owner_name: str
+    patient_feedback: FeedbackSnapshot
+    assessment: AssessmentSnapshot
+
+    # =============== audit history ==================
+    events: Annotated[list[FollowupEvent], operator.add]
+
+
+
+===== 2. receive_patient_reply.py =====
+from datetime import datetime, timezone
+from domains.followup.followup_state import ActorRole, EventType, ProcessReplyState
+
+
+def receive_patient_reply(state: ProcessReplyState) -> dict:
+    patient_name = state.get("patient_context", {}).get("patient_name", "患者")
+    consultant_name = state.get("current_owner_name", "咨询师")
+
+    return {
+        "events": [
+            {
+                "event_type": EventType.MESSAGE_DELIVERED,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "data": {
+                    "actor_role": ActorRole.PATIENT,
+                    "actor_name": patient_name,
+                    "target_role": ActorRole.CONSULTANT,
+                    "target_name": consultant_name,
+                    "content": state["patient_reply"],
+                },
+            }
+        ]
+    }
+
+===== 3. evaluate_policy.py =====
+from domains.followup.followup_state import ProcessReplyState
+from domains.followup.policies.followup_fields import REQUIRED_FIELDS
+from domains.followup.policies.followup_rules import RULES
+from datetime import datetime, timezone
+
+
+def evaluate_policy(state: ProcessReplyState) -> dict:
+    # 0. get current feedback
+    feedback = state.get("patient_feedback")
+
+    # case 1. ESCALATE
+    matched_rules = [rule["rule_id"] for rule in RULES if rule["condition"](feedback)]
+    if matched_rules:
+        assessment = {
+            "action": "ESCALATE",
+            "matched_rules": matched_rules,
+            "missing_fields": [],
+        }
+
+    # case 2. ASK_MORE
+    else:
+        missing_fields = [field for field in REQUIRED_FIELDS if feedback.get(field) is None]
+        if missing_fields:
+            assessment = {
+                "action": "ASK_MORE",
+                "matched_rules": ["MISSING_FIELDS"],
+                "missing_fields": missing_fields,
+            }
+
+        # case 3. NORMAL
+        else:
+            assessment = {
+                "action": "NORMAL",
+                "matched_rules": ["NORMAL_RECOVERY"],
+                "missing_fields": [],}
+
+
+    return {
+        "assessment": assessment,
+        "events": [
+            {
+                "event_type": "ASSESSMENT",
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "data": {
+                    "actor_role": "ai",
+                    "action": assessment["action"],
+                    "matched_rules": assessment["matched_rules"],
+                    "missing_fields": assessment["missing_fields"],
+                }
+            }
+        ]
+    }
+
+
+===== 4. generate_normal_reply.py =====
+from ai.prompts.generate_normal_reply import GENERATE_NORMAL_REPLY_PROMPT
+from domains.followup.followup_state import ProcessReplyState, EventType, ActorRole
+from infra.llm import llm_qwen
+from datetime import datetime, timezone
+
+
+def generate_normal_reply(state: ProcessReplyState):
+    chain = GENERATE_NORMAL_REPLY_PROMPT | llm_qwen
+    patient_feedback = state.get("patient_feedback", {})
+
+    response = chain.invoke({
+        "patient_name": state["patient_context"]["patient_name"],
+        "pain_score": patient_feedback.get("pain_score"),
+        "current_bleeding": patient_feedback.get("current_bleeding"),
+        "recent_bleeding": patient_feedback.get("recent_bleeding"),
+        "swelling": patient_feedback.get("swelling"),
+        "fever": patient_feedback.get("fever"),
+        "patient_reply": state["patient_reply"],
+    })
+
+    return {
+        "next_reply": response.content,
+        "events": [
+            {
+                "event_type": EventType.MESSAGE_GENERATED.value,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "data": {
+                    "actor_role": ActorRole.AI.value,
+                    "target_role": ActorRole.CONSULTANT.value,
+                    "content": response.content,
+                },
+            }
+        ],
+    }
+
+
+===== 5. record_delivered_message.py =====
+from datetime import datetime, timezone
+
+from domains.followup.followup_state import ActorRole, EventType
+from domains.followup.graphs.process_reply_graph import process_reply_graph
+
+
+def record_delivered_message(
+    thread_id: str,
+    content: str,
+    actor_id: str | None = None,
+    actor_name: str | None = None,
+    target_id: str | None = None,
+    target_name: str | None = None,
+) -> dict:
+
+    data = {
+        "actor_role": ActorRole.CONSULTANT.value,
+        "target_role": ActorRole.PATIENT.value,
+        "content": content,
+    }
+
+    if actor_id:
+        data["actor_id"] = actor_id
+    if actor_name:
+        data["actor_name"] = actor_name
+    if target_id:
+        data["target_id"] = target_id
+    if target_name:
+        data["target_name"] = target_name
+
+    event = {
+        "event_type": EventType.MESSAGE_DELIVERED.value,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "data": data,
+    }
+
+    config = {"configurable": {"thread_id": thread_id,}}
+    process_reply_graph.update_state(config, {"events": [event]},)
+    return event
+
+===== 6. page.tsx =====
+"use client";
+
+import { useEffect, useState } from "react";
+import { mockFollowup } from "../data/mockFollowup";
+
+const feedbackLabels = { pain: "疼痛", currentBleeding: "当前出血", swelling: "肿胀", fever: "发烧" } as const;
+type Action = "NORMAL" | "ASK_MORE" | "ESCALATE";
+type FollowupEvent = {
+  event_type: string;
+  timestamp: string;
+  data: {
+    actor_role?: string;
+    actor_name?: string;
+    target_role?: string;
+    target_name?: string;
+    content?: string;
+    [key: string]: unknown;
+  };
+};
+
+type ReplyResponse = {
+  followup_id: string;
+  patient_id: string;
+  treatment_id: string;
+  followup_status: string | null;
+
+  patient_feedback: {
+    pain_score: number | null;
+    current_bleeding: boolean | null;
+    recent_bleeding?: boolean | null;
+    swelling: boolean | null;
+    fever: boolean | null;
+  };
+
+  assessment: {
+    action: Action | null;
+    matched_rules: string[];
+    missing_fields: string[];
+  };
+
+  next_reply: string | null;
+  doctor_notification: string | null;
+
+  events: FollowupEvent[];
+};
+type Stage = "initial" | "waiting" | "review" | "complete" | "escalated";
+
+function yesNoUnknown(value: boolean | null) {
+  return value === null ? "未知" : value ? "是" : "否";
+}
+
+export default function Home() {
+  const [threadId] = useState(() => crypto.randomUUID());
+  const [consultantUserId, setConsultantUserId] = useState<string | null>(null);
+  const [stage, setStage] = useState<Stage>("initial");
+  const [initialMessage, setInitialMessage] = useState(mockFollowup.initialMessage);
+  const [patientReply, setPatientReply] = useState("");
+  const [suggestedReply, setSuggestedReply] = useState("");
+  const [events, setEvents] = useState<FollowupEvent[]>([]);
+  const [result, setResult] = useState<ReplyResponse | null>(null);
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [copied, setCopied] = useState<"initial" | "suggested" | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+
+  async function initWeComIdentity() {
+    try {
+      if (!code) {
+        const redirectUri = `${window.location.origin}${window.location.pathname}`;
+
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_BASE_URL}/wecom/oauth/authorize-url?redirect_uri=${encodeURIComponent(redirectUri)}`
+        );
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`${response.status} ${errorText}`);
+        }
+
+        const data: { authorize_url: string } = await response.json();
+
+        window.location.href = data.authorize_url;
+        return;
+      }
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_BASE_URL}/wecom/oauth/user?code=${encodeURIComponent(code)}`
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`${response.status} ${errorText}`);
+      }
+
+      const data: { user_id: string } = await response.json();
+
+      setConsultantUserId(data.user_id);
+
+      window.history.replaceState(
+        {},
+        "",
+        window.location.pathname
+      );
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? `获取企微用户失败：${error.message}`
+          : "获取企微用户失败。"
+      );
+    }
+  }
+
+  initWeComIdentity();
+}, []);
+
+  const feedback = result ? {
+  pain: result.patient_feedback.pain_score == null
+    ? "未知"
+    : `${result.patient_feedback.pain_score}/10`,
+  currentBleeding: yesNoUnknown(result.patient_feedback.current_bleeding),
+  swelling: yesNoUnknown(result.patient_feedback.swelling),
+  fever: yesNoUnknown(result.patient_feedback.fever),
+} : null;
+
+  async function copyText(text: string, target: "initial" | "suggested") {
+    await navigator.clipboard.writeText(text);
+    setCopied(target);
+    window.setTimeout(() => setCopied(null), 1600);
+  }
+
+  async function sendInitial() {
+  const content = initialMessage.trim();
+  if (!content || loading) return;
+
+  setLoading(true);
+  setError(null);
+
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}/wecom/messages/delivered`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          followup_id: "F001",
+          thread_id: threadId,
+          actor_id: consultantUserId ?? "consultant_001",
+          actor_name: "李咨询师",
+          target_id: "patient_001",
+          target_name: mockFollowup.patient.name,
+          content,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`${response.status} ${errorText}`);
+    }
+
+    const data: { event: FollowupEvent } = await response.json();
+
+    setEvents([data.event]);
+    setStage("waiting");
+  } catch (error) {
+    setError(
+      error instanceof Error
+        ? `发送失败：${error.message}`
+        : "发送失败，请稍后重试。"
+    );
+  } finally {
+    setLoading(false);
+  }
+}
+
+  async function handleAnalyze() {
+    const content = patientReply.trim();
+    if (!content || loading) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/followups/reply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ followup_id: "F001", thread_id: threadId, patient_id: "P001", treatment_id: "T001", patient_name: mockFollowup.patient.name, patient_reply: content }),
+      });
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`${response.status} ${errorText}`);
+      }
+    const data: ReplyResponse = await response.json();
+      setResult(data);
+      setEvents(data.events ?? []);
+      setSuggestedReply(data.next_reply ?? "");
+      setPatientReply("");
+      setIsDetailsOpen(false);
+      setStage("review");
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? `分析失败：${error.message}`
+          : "分析失败，请稍后重试。"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function sendSuggested() {
+  const content = suggestedReply.trim();
+  if (!content || !result?.assessment.action || loading) return;
+
+  setLoading(true);
+  setError(null);
+
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_BASE_URL}/wecom/messages/delivered`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          followup_id: "F001",
+          thread_id: threadId,
+          actor_id: consultantUserId ?? "consultant_001",
+          actor_name: "李咨询师",
+          target_id: "patient_001",
+          target_name: mockFollowup.patient.name,
+          content,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`${response.status} ${errorText}`);
+    }
+
+    const data: { event: FollowupEvent } = await response.json();
+    setEvents((items) => [...items, data.event]);
+
+    if (result.assessment.action === "ASK_MORE") {
+      setResult(null);
+      setSuggestedReply("");
+      setStage("waiting");
+    } else {
+      setStage(
+        result.assessment.action === "NORMAL"
+          ? "complete"
+          : "escalated"
+      );
+    }
+  } catch (error) {
+    setError(
+      error instanceof Error
+        ? `发送失败：${error.message}`
+        : "发送失败，请稍后重试。"
+    );
+  } finally {
+    setLoading(false);
+  }
+}
+  const conversationMessages = (events ?? [])
+  .filter(
+    (event) =>
+      event.event_type === "MESSAGE_DELIVERED" &&
+      typeof event.data.content === "string"
+  )
+  .map((event) => ({
+    id: `${event.timestamp}-${event.data.actor_role ?? "unknown"}`,
+    author:
+      event.data.actor_role === "patient"
+        ? "患者"
+        : event.data.actor_name || "咨询师",
+    role: event.data.actor_role,
+    content: event.data.content as string,
+  }));
+
+  return <main className="sidebar-shell">
+    <header className="topbar"><div className="brand-mark" aria-hidden="true">D</div><div><p className="eyebrow">Dental AI Copilot</p><h1>AI 助手</h1></div></header>
+
+    <section className="section patient-section" aria-labelledby="patient-heading">
+      <div className="section-heading-row"><h2 id="patient-heading">患者上下文</h2><span className="case-status">术后回访</span></div>
+      <div className="patient-summary"><div className="patient-avatar" aria-hidden="true">杨</div><div className="patient-copy"><strong>{mockFollowup.patient.name}</strong><span>{mockFollowup.patient.treatment} · {mockFollowup.patient.followupDay}</span></div><span className="doctor-name">{mockFollowup.patient.doctor}</span></div>
+    </section>
+
+    {stage === "initial" ? <section className="section" aria-labelledby="initial-heading">
+      <h2 id="initial-heading">首次回访</h2>
+      <textarea className="reply-editor short-editor" aria-label="首次回访消息" value={initialMessage} onChange={(event) => setInitialMessage(event.target.value)} rows={6} />
+      <div className="reply-actions"><button className="button button-secondary" type="button" onClick={() => copyText(initialMessage, "initial")}>{copied === "initial" ? "已复制" : "复制"}</button><button className="button button-primary" type="button" disabled={!initialMessage.trim()} onClick={sendInitial}>发送</button></div>
+    </section> : <section className="section" aria-labelledby="conversation-heading">
+      <h2 id="conversation-heading">对话记录</h2>
+      <ol className="conversation-timeline">{conversationMessages.map((message) => <li className={`timeline-message timeline-${message.role === "patient" ? "patient" : "assistant"}`} key={message.id}><span className="message-author">{message.author}</span><p>{message.content}</p></li>)}{stage === "waiting" && <li className="timeline-status status-waiting">等待患者回复</li>}{stage === "complete" && <li className="timeline-status status-complete">本次回访已完成</li>}{stage === "escalated" && <li className="timeline-status status-escalated">已升级医生处理</li>}</ol>
+    </section>}
+
+    {stage === "waiting" && <section className="section" aria-labelledby="patient-input-heading">
+      <h2 id="patient-input-heading">POC 患者回复输入</h2><p className="section-description">仅用于当前 POC，粘贴患者在企微中发送的最新回复</p>
+      <textarea className="reply-editor short-editor" aria-label="患者最新回复" value={patientReply} onChange={(event) => setPatientReply(event.target.value)} rows={5} disabled={loading} />
+      {error && <p className="error-message" role="alert">{error}</p>}
+      <button className="button button-primary analyze-button" type="button" disabled={!patientReply.trim() || loading} onClick={handleAnalyze}>{loading ? "分析中…" : "分析回复"}</button>
+    </section>}
+
+    {stage === "review" && result && feedback && <>
+      <section className="section" aria-labelledby="assessment-heading">
+        <div className="section-heading-row"><h2 id="assessment-heading">AI 判断</h2><span className={`action-badge action-${(result.assessment.action ?? "ASK_MORE").toLowerCase()}`}><span className="status-dot" aria-hidden="true" />{result.assessment.action ?? "ASK_MORE"}</span></div>
+        <dl className="feedback-grid">{Object.entries(feedback).map(([key, value]) => { const alert = value === "是" || (key === "pain" && result.patient_feedback.pain_score != null && result.patient_feedback.pain_score >= 7); return <div className="feedback-item" key={key}><dt>{feedbackLabels[key as keyof typeof feedbackLabels]}</dt><dd className={alert ? "value-alert" : value === "未知" ? "value-unknown" : ""}>{value}</dd></div>; })}</dl>
+        {!!result.assessment.matched_rules.length && <div className={`matched-rules rules-${(result.assessment.action ?? "ASK_MORE").toLowerCase()}`} aria-label="匹配规则">{result.assessment.matched_rules.map((rule) => <span key={rule}>{rule}</span>)}</div>}
+      </section>
+      <section className="details-section" aria-labelledby="details-heading">
+        <button className="details-trigger" type="button" aria-expanded={isDetailsOpen} aria-controls="assessment-details" onClick={() => setIsDetailsOpen((open) => !open)}><span id="details-heading">AI 判断详情</span><span className={`chevron ${isDetailsOpen ? "chevron-open" : ""}`} aria-hidden="true" /></button>
+        {isDetailsOpen && <div className="details-content" id="assessment-details">
+          <div className="detail-group"><h3>提取反馈</h3><dl className="detail-list">{Object.entries(feedback).map(([key, value]) => <div key={key}><dt>{feedbackLabels[key as keyof typeof feedbackLabels]}</dt><dd>{value}</dd></div>)}</dl></div>
+          <div className="detail-group"><h3>策略动作</h3><p className={`detail-action action-text-${(result.assessment.action ?? "ASK_MORE").toLowerCase()}`}>{result.assessment.action ?? "ASK_MORE"}</p></div>
+          <div className="detail-group"><h3>匹配规则</h3><ul className="plain-list">{result.assessment.matched_rules.length ? result.assessment.matched_rules.map((rule) => <li key={rule}>{rule}</li>) : <li>无</li>}</ul></div>
+          <div className="detail-group"><h3>缺失字段</h3><ul className="plain-list muted-list">{result.assessment.missing_fields.length ? result.assessment.missing_fields.map((field) => <li key={field}>{field}</li>) : <li>无</li>}</ul></div>
+        </div>}
+      </section>
+      <section className="section" aria-labelledby="suggested-reply-heading">
+        <div className="section-heading-row"><h2 id="suggested-reply-heading">建议回复</h2><span className="editable-label">可编辑</span></div>
+        <textarea className="reply-editor" aria-label="建议回复" value={suggestedReply} onChange={(event) => setSuggestedReply(event.target.value)} rows={8} />
+        <div className="reply-actions"><button className="button button-secondary" type="button" onClick={() => copyText(suggestedReply, "suggested")}>{copied === "suggested" ? "已复制" : "复制"}</button><button className="button button-primary" type="button" disabled={!suggestedReply.trim() || !result.assessment.action} onClick={sendSuggested}>发送</button></div>
+      </section>
+    </>}
+  </main>;
+}

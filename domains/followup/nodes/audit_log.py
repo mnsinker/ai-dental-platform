@@ -8,25 +8,22 @@ def audit_log(state: ProcessReplyState):
         "patient_id": state["patient_id"],
         "treatment_id": state["treatment_id"],
 
-        # 1.1 input
+        # 1. current working data
         "patient_reply": state["patient_reply"],
-        # 1.2 system's understanding
-        "feedback": {
-            "pain_score": state.get("pain_score"),
-            "current_bleeding": state.get("current_bleeding"),
-            "recent_bleeding": state.get("recent_bleeding"),
-            "swelling": state.get("swelling"),
-            "fever": state.get("fever"),
-        },
 
-        # 2. decision
-        "action": state["action"],
-        "matched_rules": state.get("matched_rules"),
-        "missing_fields": state.get("missing_fields"),
+        # 2. current snapshots
+        "patient_feedback": state.get("patient_feedback", {}),
+        "assessment": state.get("assessment", {}),
 
-        # 3. system's output
+        # 3. current system's output
         "next_reply": state.get("next_reply"),
         "doctor_notification": state.get("doctor_notification"),
+
+        # 4. current status
+        "followup_status": state.get("followup_status"),
+
+        # 5. timeline
+        "timeline": state.get("timeline", []),
 
         # # 4. execution result
         # "doctor_notification_status": "SENT",

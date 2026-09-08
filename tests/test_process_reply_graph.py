@@ -23,80 +23,61 @@ def run_case(
                 "patient_name": "王女士"
             },
             "patient_reply": patient_reply,
-            "patient_reply_history": [patient_reply],
         },
         config=config,
     )
 
     print(f"\n===== {case_name} =====")
     print("patient_reply:", patient_reply)
-    print("action:", result.get("action"))
-    print("matched_rules:", result.get("matched_rules"))
-    print("missing_fields:", result.get("missing_fields"))
+    assessment = result.get("assessment", {})
+    print("action:", assessment.get("action"))
+    print("matched_rules:", assessment.get("matched_rules"))
+    print("missing_fields:", assessment.get("missing_fields"))
     print("next_reply:", result.get("next_reply"))
     print("doctor_notification:", result.get("doctor_notification"))
     print("interrupt:", result.get("__interrupt__"))
 
     return result
 
+# ============================================================================
 
-# =========================================================
-# CASE 1: NORMAL
-# =========================================================
+def test_normal():
+    result = run_case(
+        case_name="NORMAL",
+        thread_id="followup:F_NORMAL",
+        patient_reply="现在疼痛3分，没有出血，有一点肿，没有发烧。",
+    )
 
-normal_result = run_case(
-    case_name="NORMAL",
-    thread_id="followup:F_NORMAL",
-    patient_reply="现在疼痛3分，没有出血，有一点肿，没有发烧。",
-)
-
-assert normal_result["action"] == "NORMAL"
-assert normal_result["matched_rules"] == ["NORMAL_RECOVERY"]
-assert normal_result["missing_fields"] == []
-assert normal_result.get("next_reply")
-
-print("NORMAL PASSED")
+    assert result["assessment"]["action"] == "NORMAL"
+    assert result["assessment"]["matched_rules"] == ["NORMAL_RECOVERY"]
+    assert result["assessment"]["missing_fields"] == []
+    assert result.get("next_reply")
 
 
-# =========================================================
-# CASE 2: ASK_MORE
-# =========================================================
+def test_ask_more():
+    result = run_case(
+        case_name="ASK_MORE",
+        thread_id="followup:F_ASK_MORE",
+        patient_reply="昨天还流血，今天已经不流了",
+    )
 
-ask_more_result = run_case(
-    case_name="ASK_MORE",
-    thread_id="followup:F_ASK_MORE",
-    patient_reply="昨天还流血，今天已经不流了", #
-)
-
-assert ask_more_result["action"] == "ASK_MORE"
-assert "MISSING_FIELDS" in ask_more_result["matched_rules"]
-assert len(ask_more_result["missing_fields"]) > 0
-assert ask_more_result.get("next_reply")
-assert ask_more_result.get("__interrupt__")
-
-print("ASK_MORE PASSED")
+    assert result["assessment"]["action"] == "ASK_MORE"
+    assert "MISSING_FIELDS" in result["assessment"]["matched_rules"]
+    assert len(result["assessment"]["missing_fields"]) > 0
+    assert result.get("next_reply")
+    assert result.get("__interrupt__")
 
 
-# =========================================================
-# CASE 3: ESCALATE
-# =========================================================
+def test_escalate():
+    result = run_case(
+        case_name="ESCALATE",
+        thread_id="followup:F_ESCALATE",
+        patient_reply="现在特别疼，大概8分，而且还在出血，没有发烧。",
+    )
 
-escalate_result = run_case(
-    case_name="ESCALATE",
-    thread_id="followup:F_ESCALATE",
-    patient_reply="现在特别疼，大概8分，而且还在出血，没有发烧。",
-)
-
-assert escalate_result["action"] == "ESCALATE"
-
-assert "HIGH_PAIN" in escalate_result["matched_rules"]
-assert "ACTIVE_BLEEDING" in escalate_result["matched_rules"]
-
-assert escalate_result["missing_fields"] == []
-assert escalate_result.get("next_reply")
-assert escalate_result.get("doctor_notification")
-
-print("ESCALATE PASSED")
-
-
-print("\n===== ALL 3 CASES PASSED =====")
+    assert result["assessment"]["action"] == "ESCALATE"
+    assert "HIGH_PAIN" in result["assessment"]["matched_rules"]
+    assert "ACTIVE_BLEEDING" in result["assessment"]["matched_rules"]
+    assert result["assessment"]["missing_fields"] == []
+    assert result.get("next_reply")
+    assert result.get("doctor_notification")

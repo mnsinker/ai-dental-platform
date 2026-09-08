@@ -20,6 +20,7 @@ app.add_middleware(
 # 3. route
 # app.include_router(wecom_router)
 app.include_router(followups_router)
+app.include_router(wecom_router)
 
 
 

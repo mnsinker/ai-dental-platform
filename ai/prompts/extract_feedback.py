@@ -11,7 +11,11 @@ EXTRACT_FEEDBACK_PROMPT = ChatPromptTemplate.from_messages(
         规则：
         1. 如果某项信息没有明确提及，返回 null。
         2. 注意区分当前状态和之前发生过的状态。
-        3. pain_score 只有患者明确给出 0-10 数字时才填写，否则返回 null。
+        3. pain_score 提取规则：
+            - 患者明确给出 0-10 数字时，填写对应数字。
+            - 患者明确表达“不疼”“没有疼痛”“完全不疼”等无疼痛含义时，填写 0。
+            - 患者只表达“有点疼”“很疼”“疼得厉害”等疼痛描述，但没有给出可明确映射的数字时，返回 null，不要猜测具体分数。
+            - 患者没有提及疼痛时，返回 null。
         """,
         ),
 
@@ -54,7 +58,20 @@ EXTRACT_FEEDBACK_PROMPT = ChatPromptTemplate.from_messages(
             }}""",
         ),
 
-        # runtime input
+        # example 4
+        ("human", "患者回复：不疼，没有出血，没有发烧，也没有肿胀。"),
+        (
+            "assistant",
+            """{{
+              "pain_score": 0,
+              "current_bleeding": false,
+              "recent_bleeding": false,
+              "swelling": false,
+              "fever": false
+            }}"""
+        ),
+
+        # runtime - human input
         (
             "human", "患者回复: \n{patient_reply}"
         )

@@ -7,6 +7,8 @@ export const mockFollowup = {
     followupDay: "Day 1",
     doctor: "Dr. 李",
   },
+  initialMessage:
+    "杨女士您好，这里是诊所术后回访。想了解一下您今天的恢复情况，目前疼痛大概几分？现在还有没有出血、肿胀或发烧？",
   latestPatientMessage:
     "医生您好，我从昨晚开始一直很疼，现在大概 8 分。嘴里还有血，不是只有一点血丝。脸好像有点肿，但没有发烧。",
   extractedFeedback: {

@@ -195,6 +195,22 @@ h1 {
   line-height: 1.65;
 }
 
+.section-description { margin: -4px 0 11px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+.conversation-timeline { position: relative; margin: 0; padding: 0 0 0 18px; list-style: none; }
+.conversation-timeline::before { position: absolute; top: 5px; bottom: 5px; left: 4px; width: 1px; background: var(--border); content: ""; }
+.timeline-message, .timeline-status { position: relative; }
+.timeline-message::before, .timeline-status::before { position: absolute; top: 5px; left: -18px; width: 7px; height: 7px; border: 2px solid #fff; border-radius: 50%; background: #89919a; box-shadow: 0 0 0 1px var(--border-strong); content: ""; }
+.timeline-message + .timeline-message, .timeline-message + .timeline-status { margin-top: 16px; }
+.timeline-message .message-author { margin-bottom: 5px; color: var(--muted); font-weight: 650; }
+.timeline-message p { margin: 0; color: #30353b; font-size: 13px; line-height: 1.65; }
+.timeline-patient::before { background: #c5cbd1; }
+.timeline-status { color: var(--muted); font-size: 12px; font-weight: 650; }
+.status-waiting::before { background: var(--amber); }
+.status-complete { color: var(--green); }
+.status-complete::before { background: var(--green); }
+.status-escalated { color: var(--red); }
+.status-escalated::before { background: var(--red); }
+
 .action-badge {
   display: inline-flex;
   align-items: center;
@@ -290,6 +306,9 @@ h1 {
   font-weight: 650;
 }
 
+.rules-ask_more span { border-color: #ead7b5; background: #fffbf3; color: var(--amber); }
+.rules-normal span { border-color: #bedfce; background: #f5fbf8; color: var(--green); }
+
 .reply-editor {
   display: block;
   width: 100%;
@@ -305,6 +324,8 @@ h1 {
   line-height: 1.65;
   transition: border-color 140ms ease, box-shadow 140ms ease;
 }
+
+.short-editor { min-height: 118px; }
 
 .reply-editor:hover {
   border-color: #bfc5cb;
@@ -359,6 +380,9 @@ h1 {
   color: #a0a5ab;
   cursor: not-allowed;
 }
+
+.analyze-button { width: 100%; margin-top: 10px; }
+.error-message { margin: 9px 0 0; color: var(--red); font-size: 12px; }
 
 .details-section {
   border-bottom: 1px solid var(--border);
@@ -455,6 +479,9 @@ h1 {
   font-size: 12px;
   font-weight: 750;
 }
+
+.action-text-normal { color: var(--green); }
+.action-text-ask_more { color: var(--amber); }
 
 .plain-list {
   display: flex;

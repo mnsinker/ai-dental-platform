@@ -1,0 +1,178 @@
+domains/followup/nodes/generate_doctor_notification.py:4:def generate_doctor_notification(state: ProcessReplyState):
+domains/followup/nodes/generate_doctor_notification.py:17:    - 疼痛评分: {state.get("pain_score")}
+domains/followup/nodes/generate_doctor_notification.py:18:    - 当前出血: {state.get("current_bleeding")}
+domains/followup/nodes/generate_doctor_notification.py:19:    - 近期出血: {state.get("recent_bleeding")}
+domains/followup/nodes/generate_doctor_notification.py:20:    - 肿胀: {state.get("swelling")}
+domains/followup/nodes/generate_doctor_notification.py:21:    - 发热: {state.get("fever")}
+domains/followup/nodes/generate_doctor_notification.py:26:    return {"doctor_notification": message}
+domains/followup/nodes/generate_escalation_reply.py:10:        "pain_score": state.get("pain_score"),
+domains/followup/nodes/generate_escalation_reply.py:11:        "current_bleeding": state.get("current_bleeding"),
+domains/followup/nodes/generate_escalation_reply.py:12:        "recent_bleeding": state.get("recent_bleeding"),
+domains/followup/nodes/generate_escalation_reply.py:13:        "swelling": state.get("swelling"),
+domains/followup/nodes/generate_escalation_reply.py:14:        "fever": state.get("fever"),
+domains/followup/nodes/generate_escalation_reply.py:17:    return {"next_reply": response.content}
+domains/followup/nodes/merge_feedback.py:5:    last_feedback = state["last_feedback"]
+domains/followup/nodes/merge_feedback.py:7:        "pain_score": last_feedback["pain_score"] if last_feedback["pain_score"] is not None else state.get("pain_score"),
+domains/followup/nodes/merge_feedback.py:8:        "current_bleeding": last_feedback["current_bleeding"] if last_feedback["current_bleeding"] is not None else state.get("current_bleeding"),
+domains/followup/nodes/merge_feedback.py:9:        "recent_bleeding": last_feedback["recent_bleeding"] if last_feedback["recent_bleeding"] is not None else state.get("recent_bleeding"),
+domains/followup/nodes/merge_feedback.py:10:        "swelling": last_feedback["swelling"] if last_feedback["swelling"] is not None else state.get("swelling"),
+domains/followup/nodes/merge_feedback.py:11:        "fever": last_feedback["fever"] if last_feedback["fever"] is not None else state.get("fever"),
+domains/followup/nodes/send_notification_to_doctor.py:5:    notification = state["doctor_notification"]
+domains/followup/nodes/route_by_action.py:4:def route_by_action(state: ProcessReplyState):
+domains/followup/nodes/route_by_action.py:5:    return state["action"]
+domains/followup/nodes/extract_feedback.py:14:    return {"last_feedback": patient_feedback.model_dump()}
+domains/followup/nodes/generate_further_questions.py:16:        "pain_score": state.get("pain_score"),
+domains/followup/nodes/generate_further_questions.py:17:        "current_bleeding": state.get("current_bleeding"),
+domains/followup/nodes/generate_further_questions.py:18:        "recent_bleeding": state.get("recent_bleeding"),
+domains/followup/nodes/generate_further_questions.py:19:        "swelling": state.get("swelling"),
+domains/followup/nodes/generate_further_questions.py:20:        "fever": state.get("fever"),
+domains/followup/nodes/generate_further_questions.py:24:    # 1.3 prep: missing_fields
+domains/followup/nodes/generate_further_questions.py:25:    missing_fields = state["missing_fields"]
+domains/followup/nodes/generate_further_questions.py:27:    # 1.4 prep: action
+domains/followup/nodes/generate_further_questions.py:28:    action = state["action"]
+domains/followup/nodes/generate_further_questions.py:36:        "action": action,
+domains/followup/nodes/generate_further_questions.py:37:        "missing_fields": missing_fields,
+domains/followup/nodes/generate_further_questions.py:40:    return {"next_reply": response.content}
+domains/followup/nodes/evaluate_policy.py:8:    matched_rules = [rule["rule_id"] for rule in RULES if rule["condition"](state)]
+domains/followup/nodes/evaluate_policy.py:9:    if matched_rules:
+domains/followup/nodes/evaluate_policy.py:11:            "action": "ESCALATE",
+domains/followup/nodes/evaluate_policy.py:12:            "matched_rules": matched_rules,
+domains/followup/nodes/evaluate_policy.py:13:            "missing_fields": [],
+domains/followup/nodes/evaluate_policy.py:17:    missing_fields = [field for field in REQUIRED_FIELDS if state.get(field) is None]
+domains/followup/nodes/evaluate_policy.py:18:    if missing_fields:
+domains/followup/nodes/evaluate_policy.py:20:            "action": "ASK_MORE",
+domains/followup/nodes/evaluate_policy.py:21:            "matched_rules": ["MISSING_FIELDS"],
+domains/followup/nodes/evaluate_policy.py:22:            "missing_fields": missing_fields,
+domains/followup/nodes/evaluate_policy.py:27:        "action": "NORMAL",
+domains/followup/nodes/evaluate_policy.py:28:        "matched_rules": ["NORMAL_RECOVERY"],
+domains/followup/nodes/evaluate_policy.py:29:        "missing_fields": [],
+domains/followup/nodes/wait_patient.py:15:        "patient_reply_history": [new_reply],
+domains/followup/nodes/generate_normal_reply.py:10:        "pain_score": state.get("pain_score"),
+domains/followup/nodes/generate_normal_reply.py:11:        "current_bleeding": state.get("current_bleeding"),
+domains/followup/nodes/generate_normal_reply.py:12:        "recent_bleeding": state.get("recent_bleeding"),
+domains/followup/nodes/generate_normal_reply.py:13:        "swelling": state.get("swelling"),
+domains/followup/nodes/generate_normal_reply.py:14:        "fever": state.get("fever"),
+domains/followup/nodes/generate_normal_reply.py:18:    return {"next_reply": response.content}
+domains/followup/nodes/audit_log.py:15:            "pain_score": state.get("pain_score"),
+domains/followup/nodes/audit_log.py:16:            "current_bleeding": state.get("current_bleeding"),
+domains/followup/nodes/audit_log.py:17:            "recent_bleeding": state.get("recent_bleeding"),
+domains/followup/nodes/audit_log.py:18:            "swelling": state.get("swelling"),
+domains/followup/nodes/audit_log.py:19:            "fever": state.get("fever"),
+domains/followup/nodes/audit_log.py:23:        "action": state["action"],
+domains/followup/nodes/audit_log.py:24:        "matched_rules": state.get("matched_rules"),
+domains/followup/nodes/audit_log.py:25:        "missing_fields": state.get("missing_fields"),
+domains/followup/nodes/audit_log.py:28:        "next_reply": state.get("next_reply"),
+domains/followup/nodes/audit_log.py:29:        "doctor_notification": state.get("doctor_notification"),
+domains/followup/nodes/audit_log.py:32:        # "doctor_notification_status": "SENT",
+domains/followup/followup_state.py:42:    action: Action
+domains/followup/followup_state.py:43:    matched_rules: list[str]
+domains/followup/followup_state.py:44:    missing_fields: list[str]
+domains/followup/followup_state.py:68:    pain_score: Optional[int]
+domains/followup/followup_state.py:69:    current_bleeding: Optional[bool]
+domains/followup/followup_state.py:70:    recent_bleeding: Optional[bool]
+domains/followup/followup_state.py:71:    swelling: Optional[bool]
+domains/followup/followup_state.py:72:    fever: Optional[bool]
+domains/followup/followup_state.py:75:    action: Action
+domains/followup/followup_state.py:76:    matched_rules: list[str]
+domains/followup/followup_state.py:77:    missing_fields: list[str]
+domains/followup/followup_state.py:84:    next_reply: str
+domains/followup/followup_state.py:85:    doctor_notification: str
+domains/followup/policies/followup_fields.py:2:    "pain_score",
+domains/followup/policies/followup_fields.py:3:    "current_bleeding",
+domains/followup/policies/followup_fields.py:4:    "swelling",
+domains/followup/policies/followup_fields.py:5:    "fever",
+domains/followup/policies/followup_rules.py:4:        "condition": lambda state: state.get("pain_score") is not None and state["pain_score"] >= 7,
+domains/followup/policies/followup_rules.py:5:        "action": "ESCALATE",
+domains/followup/policies/followup_rules.py:10:        "condition": lambda state: state.get("current_bleeding") is True,
+domains/followup/policies/followup_rules.py:11:        "action": "ESCALATE",
+domains/followup/policies/followup_rules.py:16:        "condition": lambda state: state.get("fever") is True,
+domains/followup/policies/followup_rules.py:17:        "action": "ESCALATE",
+domains/followup/schemas/patient_feedback.py:5:    pain_score: int | None = Field(default=None, ge=0, le=10)
+domains/followup/schemas/patient_feedback.py:6:    current_bleeding: bool | None = None
+domains/followup/schemas/patient_feedback.py:7:    recent_bleeding: bool | None = None
+domains/followup/schemas/patient_feedback.py:8:    swelling: bool | None = None
+domains/followup/schemas/patient_feedback.py:9:    fever: bool | None = None
+domains/followup/graphs/process_reply_graph.py:7:from domains.followup.nodes.generate_doctor_notification import generate_doctor_notification
+domains/followup/graphs/process_reply_graph.py:12:from domains.followup.nodes.route_by_action import route_by_action
+domains/followup/graphs/process_reply_graph.py:29:    builder.add_node("generate_doctor_notification", generate_doctor_notification)
+domains/followup/graphs/process_reply_graph.py:44:        route_by_action,
+domains/followup/graphs/process_reply_graph.py:46:            # left = return value from "route by action";
+domains/followup/graphs/process_reply_graph.py:58:    builder.add_edge("generate_escalation_reply", "generate_doctor_notification")
+domains/followup/graphs/process_reply_graph.py:59:    builder.add_edge("generate_doctor_notification", "send_notification_to_doctor")
+api/schemas/followup.py:14:    action: str | None = None
+api/schemas/followup.py:15:    matched_rules: list[str] = []
+api/schemas/followup.py:16:    missing_fields: list[str] = []
+api/schemas/followup.py:17:    next_reply: str | None = None
+api/schemas/followup.py:18:    doctor_notification: str | None = None
+api/schemas/followup.py:20:    pain_score: int | None = None
+api/schemas/followup.py:21:    current_bleeding: bool | None = None
+api/schemas/followup.py:22:    swelling: bool | None = None
+api/schemas/followup.py:23:    fever: bool | None = None
+api/routes/followups.py:17:        "patient_reply_history": [request.patient_reply],
+api/routes/followups.py:24:        "action": result.get("action"),
+api/routes/followups.py:25:        "matched_rules": result.get("matched_rules", []),
+api/routes/followups.py:26:        "missing_fields": result.get("missing_fields", []),
+api/routes/followups.py:27:        "next_reply": result.get("next_reply"),
+api/routes/followups.py:28:        "doctor_notification": result.get("doctor_notification"),
+api/routes/followups.py:29:        "pain_score": result.get("pain_score"),
+api/routes/followups.py:30:        "current_bleeding": result.get("current_bleeding"),
+api/routes/followups.py:31:        "swelling": result.get("swelling"),
+api/routes/followups.py:32:        "fever": result.get("fever"),
+tests/test_process_reply_graph.py:26:            "patient_reply_history": [patient_reply],
+tests/test_process_reply_graph.py:33:    print("action:", result.get("action"))
+tests/test_process_reply_graph.py:34:    print("matched_rules:", result.get("matched_rules"))
+tests/test_process_reply_graph.py:35:    print("missing_fields:", result.get("missing_fields"))
+tests/test_process_reply_graph.py:36:    print("next_reply:", result.get("next_reply"))
+tests/test_process_reply_graph.py:37:    print("doctor_notification:", result.get("doctor_notification"))
+tests/test_process_reply_graph.py:53:assert normal_result["action"] == "NORMAL"
+tests/test_process_reply_graph.py:54:assert normal_result["matched_rules"] == ["NORMAL_RECOVERY"]
+tests/test_process_reply_graph.py:55:assert normal_result["missing_fields"] == []
+tests/test_process_reply_graph.py:56:assert normal_result.get("next_reply")
+tests/test_process_reply_graph.py:71:assert ask_more_result["action"] == "ASK_MORE"
+tests/test_process_reply_graph.py:72:assert "MISSING_FIELDS" in ask_more_result["matched_rules"]
+tests/test_process_reply_graph.py:73:assert len(ask_more_result["missing_fields"]) > 0
+tests/test_process_reply_graph.py:74:assert ask_more_result.get("next_reply")
+tests/test_process_reply_graph.py:90:assert escalate_result["action"] == "ESCALATE"
+tests/test_process_reply_graph.py:92:assert "HIGH_PAIN" in escalate_result["matched_rules"]
+tests/test_process_reply_graph.py:93:assert "ACTIVE_BLEEDING" in escalate_result["matched_rules"]
+tests/test_process_reply_graph.py:95:assert escalate_result["missing_fields"] == []
+tests/test_process_reply_graph.py:96:assert escalate_result.get("next_reply")
+tests/test_process_reply_graph.py:97:assert escalate_result.get("doctor_notification")
+tests/test_evaluate_policy.py:9:                "pain_score": 3,
+tests/test_evaluate_policy.py:10:                "current_bleeding": False,
+tests/test_evaluate_policy.py:11:                "swelling": True,
+tests/test_evaluate_policy.py:12:                "fever": False,
+tests/test_evaluate_policy.py:20:                "pain_score": 0,
+tests/test_evaluate_policy.py:21:                "current_bleeding": None,
+tests/test_evaluate_policy.py:22:                "swelling": None,
+tests/test_evaluate_policy.py:23:                "fever": None,
+tests/test_evaluate_policy.py:31:                "pain_score": 8,
+tests/test_evaluate_policy.py:32:                "current_bleeding": True,
+tests/test_evaluate_policy.py:33:                "swelling": None,
+tests/test_evaluate_policy.py:34:                "fever": True,
+tests/test_evaluate_policy.py:42:        actual = result["action"]
+tests/test_structured_qwen.py:6:    pain_score: int | None = None
+tests/test_structured_qwen.py:7:    fever: bool | None = None
+tests/test_wait_patient.py:14:        "patient_reply_history": [],
+tests/test_generate_next_reply.py:1:from domains.followup.nodes.generate_next_reply import generate_next_reply
+tests/test_generate_next_reply.py:9:            "pain_score": 3,
+tests/test_generate_next_reply.py:10:            "current_bleeding": False,
+tests/test_generate_next_reply.py:11:            "recent_bleeding": None,
+tests/test_generate_next_reply.py:12:            "swelling": True,
+tests/test_generate_next_reply.py:13:            "fever": False,
+tests/test_generate_next_reply.py:14:            "action": "NORMAL",
+tests/test_generate_next_reply.py:18:            "pain_score": None,
+tests/test_generate_next_reply.py:19:            "current_bleeding": False,
+tests/test_generate_next_reply.py:20:            "recent_bleeding": True,
+tests/test_generate_next_reply.py:21:            "swelling": None,
+tests/test_generate_next_reply.py:22:            "fever": False,
+tests/test_generate_next_reply.py:23:            "action": "ASK_MORE",
+tests/test_generate_next_reply.py:27:            "pain_score": 8,
+tests/test_generate_next_reply.py:28:            "current_bleeding": True,
+tests/test_generate_next_reply.py:29:            "recent_bleeding": None,
+tests/test_generate_next_reply.py:30:            "swelling": None,
+tests/test_generate_next_reply.py:31:            "fever": True,
+tests/test_generate_next_reply.py:32:            "action": "ESCALATE",
+tests/test_generate_next_reply.py:37:        result = generate_next_reply(state)
+tests/test_generate_next_reply.py:40:        print("Action:", state["action"])
+tests/test_generate_next_reply.py:42:        print(result["next_reply"])

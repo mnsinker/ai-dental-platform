@@ -1,4 +1,4 @@
-from domains.followup.nodes.generate_next_reply import generate_next_reply
+from domains.followup.nodes.generate_further_questions import generate_further_questions
 from domains.followup.followup_state import ProcessReplyState
 
 
@@ -34,10 +34,10 @@ def main():
     ]
 
     for state in cases:
-        result = generate_next_reply(state)
+        result = generate_further_questions(state)
 
         print("=" * 50)
-        print("Action:", state["action"])
+        print("Action:", state["assessment"]["action"])
         print("Reply:")
         print(result["next_reply"])
 

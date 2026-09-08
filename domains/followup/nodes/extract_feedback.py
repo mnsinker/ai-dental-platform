@@ -7,8 +7,19 @@ from infra.llm import llm_qwen
 
 
 def extract_feedback(state: ProcessReplyState) -> dict:
+    # 1. last feedback
+    last_feedback = state.get("patient_feedback", {})
+
+    # 2. new feedback
     structured_llm = llm_qwen.with_structured_output(PatientFeedback)
     chain = EXTRACT_FEEDBACK_PROMPT | structured_llm
-    patient_feedback = chain.invoke({"patient_reply": state["patient_reply"]})
+    new_feedback = chain.invoke({"patient_reply": state["patient_reply"]}).model_dump()
 
-    return {"last_feedback": patient_feedback.model_dump()}
+    # 3. merged feedback
+    merged_feedback = {
+        key: value if value is not None else last_feedback.get(key)
+        for key, value in new_feedback.items()
+    }
+
+    return {"patient_feedback": merged_feedback}
+

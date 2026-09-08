@@ -14,21 +14,36 @@ def process_reply(request: ReplyRequest):
         "treatment_id": request.treatment_id,
         "patient_context": {"patient_name": request.patient_name},
         "patient_reply": request.patient_reply,
-        "patient_reply_history": [request.patient_reply],
     }
-    config = {"configurable": {"thread_id": f"followup:{request.followup_id}"}}
+    config = {"configurable": {"thread_id": request.thread_id}}
 
     # 2. invoke graph
     result = process_reply_graph.invoke(input_state, config=config)
+
+    # 3. return values back to FE
     return {
-        "action": result.get("action"),
-        "matched_rules": result.get("matched_rules", []),
-        "missing_fields": result.get("missing_fields", []),
+        "followup_id": result.get("followup_id", request.followup_id),
+        "patient_id": result.get("patient_id", request.patient_id),
+        "treatment_id": result.get("treatment_id", request.treatment_id),
+        "followup_status": result.get("followup_status"),
+        "patient_feedback": result.get("patient_feedback", {}),
+        "assessment": result.get("assessment", {}),
         "next_reply": result.get("next_reply"),
         "doctor_notification": result.get("doctor_notification"),
-        "pain_score": result.get("pain_score"),
-        "current_bleeding": result.get("current_bleeding"),
-        "swelling": result.get("swelling"),
-        "fever": result.get("fever"),
+        "events": result.get("events", []),
+    }
+
+
+@router.get("/state/{thread_id}")
+def get_followup_state(thread_id: str):
+    config = {"configurable": {"thread_id": thread_id,}}
+
+    snapshot = process_reply_graph.get_state(config)
+    values = snapshot.values or {}
+
+    return {
+        "thread_id": thread_id,
+        "followup_id": values.get("followup_id"),
+        "events": values.get("events", []),
     }
 

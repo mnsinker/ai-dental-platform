@@ -1,6 +1,8 @@
 import json
+from datetime import datetime, timezone
+
 from ai.prompts.generate_further_questions import GENERATE_FURTHER_QUESTIONS_PROMPT
-from domains.followup.followup_state import ProcessReplyState
+from domains.followup.followup_state import ProcessReplyState, EventType, ActorRole
 from infra.llm import llm_qwen
 
 
@@ -12,20 +14,13 @@ def generate_further_questions(state: ProcessReplyState):
     patient_reply = state.get("patient_reply", "")
 
     # 1.2 prep: patient feedback
-    patient_feedback = {
-        "pain_score": state.get("pain_score"),
-        "current_bleeding": state.get("current_bleeding"),
-        "recent_bleeding": state.get("recent_bleeding"),
-        "swelling": state.get("swelling"),
-        "fever": state.get("fever"),
-    }
+    patient_feedback = state.get("patient_feedback", {})
     patient_feedback = json.dumps(patient_feedback, ensure_ascii=False)
 
-    # 1.3 prep: missing_fields
-    missing_fields = state["missing_fields"]
-
-    # 1.4 prep: action
-    action = state["action"]
+    # 1.3 prep: assessment
+    assessment = state.get("assessment", {})
+    missing_fields = assessment.get("missing_fields", [])
+    action = assessment.get("action")
 
 
     # 2. invoke llm
@@ -37,4 +32,17 @@ def generate_further_questions(state: ProcessReplyState):
         "missing_fields": missing_fields,
     })
 
-    return {"next_reply": response.content}
+    return {
+        "next_reply": response.content,
+        "events": [
+            {
+                "event_type": EventType.MESSAGE_GENERATED.value,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "data": {
+                    "actor_role": ActorRole.AI.value,
+                    "target_role": ActorRole.CONSULTANT.value,
+                    "content": response.content,
+                },
+            }
+        ],
+    }
